@@ -1,4 +1,4 @@
-rootProject.name = "my-project"
+rootProject.name = "commander"
 
 include("app")
 include("core")

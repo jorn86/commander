@@ -1,11 +1,27 @@
+import org.jetbrains.compose.compose
+import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+
 plugins {
-    application
+    id("org.jetbrains.compose") version "1.0.0"
 }
 
 dependencies {
     api(project(":core"))
+    implementation(compose.desktop.currentOs)
+    implementation(compose.materialIconsExtended)
+    implementation("com.h2database:h2:2.1.210")
+    implementation("org.slf4j:slf4j-simple:1.7.36")
+    implementation("com.google.guava:guava:31.1-jre")
 }
 
-application {
-    mainClass.set("org.hertsig.app.AppKt")
+compose.desktop {
+    application {
+        mainClass = "org.hertsig.commander.AppKt"
+        nativeDistributions {
+            targetFormats(TargetFormat.Msi)
+            packageName = "commander"
+            packageVersion = "1.0.0"
+        }
+    }
 }
+
