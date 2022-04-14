@@ -5,6 +5,7 @@ import java.awt.image.BufferedImage
 import java.nio.file.Files
 import java.nio.file.Path
 import javax.swing.ImageIcon
+import javax.swing.JFileChooser
 import javax.swing.filechooser.FileSystemView
 
 private const val KB = 1024f
@@ -35,7 +36,9 @@ fun fileType(path: Path): String? = FileSystemView.getFileSystemView().getSystem
     ?: Files.probeContentType(path)
 
 fun getFileIcon(path: Path): BufferedImage? {
-    val systemIcon = FileSystemView.getFileSystemView().getSystemIcon(path.toFile())
+    val fc = JFileChooser()
+    val systemIcon = fc.ui.getFileView(fc).getIcon(path.toFile())
+//    val systemIcon = FileSystemView.getFileSystemView().getSystemIcon(path.toFile())
     val icon = systemIcon as? ImageIcon
     val image = icon?.image as? BufferedImage
     if (image == null) {
