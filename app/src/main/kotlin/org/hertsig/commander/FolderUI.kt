@@ -10,14 +10,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.FolderOpen
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.pointer.PointerKeyboardModifiers
 import androidx.compose.ui.platform.LocalFocusManager
@@ -26,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.google.common.collect.Ordering
 import org.hertsig.commander.core.Favorite
+import org.hertsig.commander.core.fileType
 import org.hertsig.commander.core.formatSize
 import org.hertsig.mouse.MouseListener
 import org.slf4j.LoggerFactory
@@ -36,7 +35,6 @@ import java.io.File
 import java.nio.file.AccessDeniedException
 import java.nio.file.Files
 import java.nio.file.Path
-import javax.swing.filechooser.FileSystemView
 import kotlin.io.path.fileSize
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isHidden
@@ -201,7 +199,7 @@ class FolderUI(
             FileIcon(it)
             TextCell(it.fileName.toString(), nameWeight)
             TextCell(formatSize(it.fileSize()), sizeWeight, TextAlign.Right)
-            TextCell(FileSystemView.getFileSystemView().getSystemTypeDescription(it.toFile()), typeWeight)
+            TextCell(fileType(it) ?: "", typeWeight)
         }
     }
 
