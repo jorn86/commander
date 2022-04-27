@@ -38,7 +38,7 @@ object App {
             )) {
                 val favorites = remember { mutableStateListOf<Favorite>() }
                 Row(
-                    modifier = Modifier.fillMaxSize().padding(20.dp),
+                    modifier = Modifier.fillMaxSize().padding(20.dp, 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     FolderUI(FocusDirection.Right, favorites).Panel(favorites.first().path, Modifier.fillMaxHeight().fillMaxWidth(0.5f))

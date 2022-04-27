@@ -13,8 +13,14 @@ private const val MB = KB * 1024
 private const val GB = MB * 1024
 private const val TB = GB * 1024
 
-object Util {}
+object Util
 private val log = LoggerFactory.getLogger(Util::class.java)
+
+fun formatMultiple(amount: Int, singular: String, plural: String = "${singular}s") = when {
+    amount < 1 -> null
+    amount == 1 -> "1 $singular"
+    else -> "$amount $plural"
+}
 
 fun formatSize(fileSize: Long): String {
     val (amount, unit) = when {
@@ -45,4 +51,9 @@ fun getFileIcon(path: Path): BufferedImage? {
         log.debug("Could not find icon for $path: $systemIcon (${systemIcon?.javaClass}); ${icon?.image} (${icon?.image?.javaClass})")
     }
     return image
+}
+
+fun <T> Collection<T>.countWhere(predicate: (T) -> Boolean): Pair<Int, Int> {
+    val count = count(predicate)
+    return count to size - count
 }

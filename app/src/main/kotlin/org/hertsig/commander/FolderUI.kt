@@ -7,9 +7,9 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
@@ -23,9 +23,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.google.common.collect.Ordering
-import org.hertsig.commander.core.Favorite
-import org.hertsig.commander.core.fileType
-import org.hertsig.commander.core.formatSize
+import org.hertsig.commander.core.*
 import org.hertsig.mouse.MouseListener
 import org.slf4j.LoggerFactory
 import java.awt.Desktop
@@ -38,6 +36,7 @@ import java.nio.file.Path
 import kotlin.io.path.fileSize
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isHidden
+import kotlin.io.path.moveTo
 import kotlin.streams.toList
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -75,28 +74,22 @@ class FolderUI(
             Row(Modifier.fillMaxWidth()) {
                 roots.forEach { RootButton(it) }
                 Row(Modifier.fillMaxWidth(), Arrangement.End) {
-                    Button(onClick = { forceReload() },
-                        modifier = Modifier.widthIn(1.dp).heightIn(1.dp),
-                        contentPadding = PaddingValues(8.dp, 4.dp),
-                    ) {
-                        Icon(Icons.Filled.Refresh, "Refresh")
+                    SmallButton(onClick = { forceReload() }) {
+                        Icon(Icons.Outlined.Refresh, "Refresh")
                     }
 
                     FavoritesButton()
 
-                    Button(onClick = { Desktop.getDesktop().open(current.value.toFile()) },
-                        modifier = Modifier.widthIn(1.dp).heightIn(1.dp),
-                        contentPadding = PaddingValues(8.dp, 4.dp),
-                    ) {
+                    SmallButton(onClick = { Desktop.getDesktop().open(current.value.toFile()) }) {
                         Icon(Icons.Outlined.FolderOpen, "Open in Explorer")
                     }
                 }
             }
-            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+            Column(Modifier.fillMaxSize().weight(0.1f).verticalScroll(rememberScrollState())) {
                 if (!roots.contains(current.value)) {
                     FolderLine(current.value.resolve(".."))
                 }
-                currentFolderContents().filter(::show).forEach {
+                currentFolderContents().forEach {
                     if (it.isDirectory()) {
                         FolderLine(it)
                     } else {
@@ -104,18 +97,29 @@ class FolderUI(
                     }
                 }
             }
+            StatusBar(Modifier)
 
             DeleteDialog()
         }
     }
 
     @Composable
+    private fun StatusBar(modifier: Modifier = Modifier) {
+        Row(modifier.background(MaterialTheme.colors.secondary).fillMaxWidth().padding(4.dp, 2.dp)) {
+            val contents = currentFolderContents()
+            val (folders, files) = contents.countWhere { it.isDirectory() }
+            val size = contents.filter { !it.isDirectory() }.sumOf { it.fileSize() }
+            val filesText = formatMultiple(files, "file")?.let { "$it (${formatSize(size)})" }
+            val text = listOfNotNull(formatMultiple(folders, "folder"), filesText)
+                .joinToString()
+            Text(text, color = MaterialTheme.colors.onSecondary)
+        }
+    }
+
+    @Composable
     private fun FavoritesButton() {
         val showFavorites = remember { mutableStateOf(false) }
-        Button(onClick = { showFavorites.value = true },
-            modifier = Modifier.widthIn(1.dp).heightIn(1.dp),
-            contentPadding = PaddingValues(8.dp, 4.dp),
-        ) {
+        SmallButton(onClick = { showFavorites.value = true }) {
             Icon(Icons.Outlined.Favorite, "Favorites")
             DropdownMenu(showFavorites.value, onDismissRequest = { showFavorites.value = false }) {
                 favorites.forEach {
@@ -234,15 +238,29 @@ class FolderUI(
             .mouseClickable(onClick = remember(path) { listener }),
             horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             content()
-            DropdownMenu(listener.showContextMenu.value, { listener.showContextMenu.value = false }) {
-                SmallDropdownMenuItem("Delete", listener.showContextMenu) {
-                    if (path.toFile().deleteRecursively()) {
-                        log.debug("Deleted ${path.normalize()}")
-                    } else {
-                        log.warn("Failed to delete ${path.normalize()}")
-                    }
+            PathDropdownMenu(listener, path)
+        }
+    }
+
+    @Composable
+    private fun PathDropdownMenu(listener: PathMouseListener, path: Path) {
+        DropdownMenu(listener.showContextMenu.value, { listener.showContextMenu.value = false }) {
+            if (path.parent !in roots) {
+                SmallDropdownMenuItem("Move to parent", listener.showContextMenu) {
+                    val target = path.parent.parent.resolve(path.fileName)
+                    log.debug("Moving $path to $target")
+                    path.moveTo(target)
                     forceReload()
                 }
+                Divider()
+            }
+            SmallDropdownMenuItem("Delete", listener.showContextMenu) {
+                if (path.toFile().deleteRecursively()) {
+                    log.debug("Deleted ${path.normalize()}")
+                } else {
+                    log.warn("Failed to delete ${path.normalize()}")
+                }
+                forceReload()
             }
         }
     }
@@ -327,7 +345,7 @@ class FolderUI(
         current.value = folder
     }
 
-    private fun currentFolderContents() = Files.list(current.value).toList().sortedWith(fileOrder)
+    private fun currentFolderContents() = Files.list(current.value).filter(::show).toList().sortedWith(fileOrder)
 
     companion object {
         private val roots = File.listRoots().map { it.toPath() }
