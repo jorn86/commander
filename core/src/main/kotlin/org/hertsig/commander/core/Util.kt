@@ -1,6 +1,8 @@
 package org.hertsig.commander.core
 
 import org.slf4j.LoggerFactory
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 import java.awt.image.BufferedImage
 import java.nio.file.Files
 import java.nio.file.Path
@@ -42,9 +44,7 @@ fun fileType(path: Path): String? = FileSystemView.getFileSystemView().getSystem
     ?: Files.probeContentType(path)
 
 fun getFileIcon(path: Path): BufferedImage? {
-    val fc = JFileChooser()
-    val systemIcon = fc.ui.getFileView(fc).getIcon(path.toFile())
-//    val systemIcon = FileSystemView.getFileSystemView().getSystemIcon(path.toFile())
+    val systemIcon = FileSystemView.getFileSystemView().getSystemIcon(path.toFile())
     val icon = systemIcon as? ImageIcon
     val image = icon?.image as? BufferedImage
     if (image == null) {
@@ -56,4 +56,11 @@ fun getFileIcon(path: Path): BufferedImage? {
 fun <T> Collection<T>.countWhere(predicate: (T) -> Boolean): Pair<Int, Int> {
     val count = count(predicate)
     return count to size - count
+}
+
+fun setClipboard(value: String) = try {
+    val selection = StringSelection(value)
+    Toolkit.getDefaultToolkit().systemClipboard.setContents(selection, selection)
+} catch (e: Exception) {
+    log.info("Could not set clipboard to $value", e)
 }

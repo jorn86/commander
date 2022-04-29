@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.pointer.PointerKeyboardModifiers
 import androidx.compose.ui.platform.LocalFocusManager
@@ -27,8 +28,6 @@ import org.hertsig.commander.core.*
 import org.hertsig.mouse.MouseListener
 import org.slf4j.LoggerFactory
 import java.awt.Desktop
-import java.awt.Toolkit
-import java.awt.datatransfer.StringSelection
 import java.io.File
 import java.nio.file.AccessDeniedException
 import java.nio.file.Files
@@ -67,9 +66,8 @@ class FolderUI(
                 override fun onBack(modifiers: PointerKeyboardModifiers) = back()
             })
         ) {
-            Text(current.value.toString(), modifier = Modifier.clickable {
-                val selection = StringSelection(current.value.toString())
-                Toolkit.getDefaultToolkit().systemClipboard.setContents(selection, selection)
+            Text(current.value.toString(), modifier = Modifier.padding(6.dp, 0.dp).clickable {
+                setClipboard(current.value.toString())
             })
             Row(Modifier.fillMaxWidth()) {
                 roots.forEach { RootButton(it) }
@@ -85,7 +83,7 @@ class FolderUI(
                     }
                 }
             }
-            Column(Modifier.fillMaxSize().weight(0.1f).verticalScroll(rememberScrollState())) {
+            Column(Modifier.padding(6.dp).fillMaxSize().weight(0.1f).verticalScroll(rememberScrollState())) {
                 if (!roots.contains(current.value)) {
                     FolderLine(current.value.resolve(".."))
                 }
@@ -107,13 +105,18 @@ class FolderUI(
     private fun StatusBar(modifier: Modifier = Modifier) {
         Row(modifier.background(MaterialTheme.colors.secondary).fillMaxWidth().padding(4.dp, 2.dp)) {
             val contents = currentFolderContents()
-            val (folders, files) = contents.countWhere { it.isDirectory() }
-            val size = contents.filter { !it.isDirectory() }.sumOf { it.fileSize() }
-            val filesText = formatMultiple(files, "file")?.let { "$it (${formatSize(size)})" }
-            val text = listOfNotNull(formatMultiple(folders, "folder"), filesText)
-                .joinToString()
-            Text(text, color = MaterialTheme.colors.onSecondary)
+            Text(statusBarText(contents), color = MaterialTheme.colors.onSecondary)
+            if (selection.isNotEmpty()) {
+                Text("Selected: ${statusBarText(selection)}", Modifier.fillMaxWidth(), MaterialTheme.colors.onSecondary, textAlign = TextAlign.End)
+            }
         }
+    }
+
+    private fun statusBarText(contents: List<Path>): String {
+        val (folders, files) = contents.countWhere { it.isDirectory() }
+        val size = contents.filter { !it.isDirectory() }.sumOf { it.fileSize() }
+        val filesText = formatMultiple(files, "file")?.let { "$it (${formatSize(size)})" }
+        return listOfNotNull(formatMultiple(folders, "folder"), filesText).joinToString()
     }
 
     @Composable
@@ -129,14 +132,6 @@ class FolderUI(
                 }
             }
         }
-    }
-
-    @Composable
-    private fun SmallDropdownMenuItem(text: String, visible: MutableState<Boolean>, onClick: () -> Unit) {
-        Text(text, Modifier.fillMaxWidth().clickable {
-            onClick()
-            visible.value = false
-        }.padding(8.dp, 4.dp))
     }
 
     private fun show(path: Path) = try {
@@ -177,19 +172,10 @@ class FolderUI(
 
     @Composable
     private fun RootButton(path: Path) {
-        TooltipArea({
-            val free = formatSize(path.toFile().freeSpace)
-            val total = formatSize(path.toFile().totalSpace)
-            Text("Free: $free / $total", Modifier
-                .background(MaterialTheme.colors.background)
-                .border(1.dp, MaterialTheme.colors.primaryVariant)
-                .padding(5.dp))
-        }) {
-            Button(
-                onClick = { setCurrentFolder(path) },
-                modifier = Modifier.sizeIn(minWidth = 1.dp, minHeight = 1.dp),
-                contentPadding = PaddingValues(8.dp, 4.dp),
-            ) {
+        val free = formatSize(path.toFile().freeSpace)
+        val total = formatSize(path.toFile().totalSpace)
+        TooltipText("Free: $free / $total"){
+            SmallButton({ setCurrentFolder(path) }) {
                 Text(path.toString())
             }
         }
@@ -201,9 +187,14 @@ class FolderUI(
         val showContextMenu = remember { mutableStateOf(false) }
         PathLine(it, FileMouseListener(this@FolderUI, it, focusRequester, showContextMenu)) {
             FileIcon(it)
-            TextCell(it.fileName.toString(), nameWeight)
-            TextCell(formatSize(it.fileSize()), sizeWeight, TextAlign.Right)
-            TextCell(fileType(it) ?: "", typeWeight)
+            TooltipText(it.fileName.toString(), Modifier.weight(nameWeight).fillMaxWidth()) {
+                Text(it.fileName.toString(), softWrap = false, maxLines = 1, overflow = TextOverflow.Clip)
+            }
+            Text(formatSize(it.fileSize()), Modifier.weight(sizeWeight).fillMaxWidth(), textAlign = TextAlign.Right)
+            val type = fileType(it) ?: ""
+            TooltipText(type, Modifier.weight(typeWeight).fillMaxWidth()) {
+                Text(type, softWrap = false, maxLines = 1, overflow = TextOverflow.Clip)
+            }
         }
     }
 
@@ -213,7 +204,9 @@ class FolderUI(
         val showContextMenu = remember { mutableStateOf(false) }
         PathLine(folder, FolderMouseListener(this@FolderUI, folder, focusRequester, showContextMenu)) {
             FileIcon(folder)
-            Text(folder.fileName.toString(), softWrap = false, overflow = TextOverflow.Ellipsis)
+            TooltipText(folder.fileName.toString()) {
+                Text(folder.fileName.toString(), softWrap = false, maxLines = 1, overflow = TextOverflow.Clip)
+            }
         }
     }
 
@@ -243,16 +236,26 @@ class FolderUI(
     }
 
     @Composable
+    private fun TooltipText(text: String, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+        TooltipArea({
+            Text(text, Modifier
+                .background(MaterialTheme.colors.background)
+                .border(1.dp, MaterialTheme.colors.primaryVariant)
+                .padding(3.dp))
+        }, modifier, content = content)
+    }
+
+    @Composable
     private fun PathDropdownMenu(listener: PathMouseListener, path: Path) {
         DropdownMenu(listener.showContextMenu.value, { listener.showContextMenu.value = false }) {
-            if (path.parent !in roots) {
-                SmallDropdownMenuItem("Move to parent", listener.showContextMenu) {
-                    val target = path.parent.parent.resolve(path.fileName)
-                    log.debug("Moving $path to $target")
-                    path.moveTo(target)
-                    forceReload()
-                }
-                Divider()
+            SmallDropdownMenuItem("Copy path", listener.showContextMenu) {
+                setClipboard(path.toString())
+            }
+            SmallDropdownMenuItem("Move to parent", listener.showContextMenu, path.parent !in roots) {
+                val target = path.parent.parent.resolve(path.fileName)
+                log.debug("Moving $path to $target")
+                path.moveTo(target)
+                forceReload()
             }
             SmallDropdownMenuItem("Delete", listener.showContextMenu) {
                 if (path.toFile().deleteRecursively()) {
@@ -266,16 +269,25 @@ class FolderUI(
     }
 
     @Composable
+    private fun SmallDropdownMenuItem(text: String, visible: MutableState<Boolean>, enabled: Boolean = true, onClick: () -> Unit) {
+        val source = remember { MutableInteractionSource() }
+        val hovered = source.collectIsHoveredAsState()
+        var modifier = Modifier.fillMaxWidth()
+        if (enabled) {
+            modifier = modifier.clickable(source, LocalIndication.current) {
+                onClick()
+                visible.value = false
+            }
+        }
+        Text(text, modifier.background(if (hovered.value) Color.LightGray else Color.Unspecified).padding(8.dp, 4.dp),
+            if (enabled) Color.Unspecified else Color.Gray)
+    }
+
+    @Composable
     private fun background(selected: Boolean, hovered: Boolean) = when {
         selected -> MaterialTheme.colors.secondary
         hovered -> MaterialTheme.colors.secondaryVariant
         else -> MaterialTheme.colors.background
-    }
-
-    @Composable
-    private fun RowScope.TextCell(text: String, weight: Float, align: TextAlign = TextAlign.Left) {
-        Text(text, textAlign = align, softWrap = false, maxLines = 1, overflow = TextOverflow.Clip,
-            modifier = Modifier.weight(weight).fillMaxWidth())
     }
 
     fun setCurrentFolder(path: Path) {

@@ -1,6 +1,7 @@
 package org.hertsig.commander
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.Divider
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Typography
 import androidx.compose.material.lightColors
@@ -37,11 +38,9 @@ object App {
                 subtitle1 = TextStyle(fontWeight = FontWeight.Normal, fontSize = 12.sp, letterSpacing = 0.25.sp),
             )) {
                 val favorites = remember { mutableStateListOf<Favorite>() }
-                Row(
-                    modifier = Modifier.fillMaxSize().padding(20.dp, 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
+                Row(Modifier.fillMaxSize()) {
                     FolderUI(FocusDirection.Right, favorites).Panel(favorites.first().path, Modifier.fillMaxHeight().fillMaxWidth(0.5f))
+                    Divider(Modifier.fillMaxHeight().width(1.dp), Color.Black)
                     // "max width" meaning the rest of what's left (after the left panel takes half). Yes, very intuitive.
                     FolderUI(FocusDirection.Left, favorites).Panel(favorites[4].path, modifier = Modifier.fillMaxHeight().fillMaxWidth())
                 }
