@@ -4,3 +4,5 @@ build/
 .idea/
 
 *.lnk
+
+commander.log

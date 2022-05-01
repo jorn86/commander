@@ -1,4 +1,4 @@
-package org.hertsig.commander
+package org.hertsig.commander.ui.component
 
 import androidx.compose.foundation.Image
 import androidx.compose.runtime.Composable

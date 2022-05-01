@@ -1,13 +1,14 @@
-package org.hertsig.commander
+package org.hertsig.commander.interaction
 
 import androidx.compose.runtime.MutableState
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.pointer.PointerKeyboardModifiers
+import org.hertsig.commander.ui.FolderPanel
 import java.awt.Desktop
 import java.nio.file.Path
 
 class FileMouseListener(
-    ui: FolderUI,
+    ui: FolderPanel,
     file: Path,
     focusRequester: FocusRequester,
     showContextMenu: MutableState<Boolean>
