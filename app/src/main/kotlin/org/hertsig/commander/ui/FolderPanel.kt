@@ -33,6 +33,7 @@ import java.nio.file.Path
 import kotlin.io.path.fileSize
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isHidden
+import kotlin.io.path.isRegularFile
 import kotlin.streams.toList
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -139,7 +140,7 @@ class FolderPanel(
 
     private fun statusBarText(contents: List<Path>): String {
         val (folders, files) = contents.countWhere { it.isDirectory() }
-        val size = contents.filter { !it.isDirectory() }.sumOf { it.fileSize() }
+        val size = contents.filter { it.isRegularFile() }.sumOf { it.fileSize() }
         val filesText = formatMultiple(files, "file")?.let { "$it (${formatSize(size)})" }
         return listOfNotNull(formatMultiple(folders, "folder"), filesText).joinToString()
     }

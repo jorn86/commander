@@ -45,7 +45,7 @@ class PathLine(private val parent: FolderPanel) {
     fun FileLine(file: Path) {
         val focusRequester = remember { FocusRequester() }
         val showContextMenu = remember { mutableStateOf(false) }
-        val listener = remember { FileMouseListener(parent, file, focusRequester, showContextMenu) }
+        val listener = remember(file) { FileMouseListener(parent, file, focusRequester, showContextMenu) }
         PathLine(file, listener) {
             FileIcon(file)
             TooltipText(file.fileName.toString(), Modifier.weight(nameWeight).fillMaxWidth()) {
@@ -102,12 +102,6 @@ class PathLine(private val parent: FolderPanel) {
         }
     }
 
-    companion object {
-        private const val nameWeight = 15f
-        private const val sizeWeight = 3f
-        private const val typeWeight = 4f
-    }
-
     @Composable
     private fun PathDropdownMenu(listener: PathMouseListener, path: Path) {
         CursorDropdownMenu(listener.showContextMenu.value, { listener.showContextMenu.value = false }) {
@@ -136,5 +130,11 @@ class PathLine(private val parent: FolderPanel) {
         selected -> MaterialTheme.colors.secondary
         hovered -> MaterialTheme.colors.secondaryVariant
         else -> MaterialTheme.colors.background
+    }
+
+    companion object {
+        private const val nameWeight = 15f
+        private const val sizeWeight = 3f
+        private const val typeWeight = 4f
     }
 }
