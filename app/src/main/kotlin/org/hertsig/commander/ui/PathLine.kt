@@ -35,7 +35,12 @@ import org.hertsig.commander.ui.component.TooltipText
 import org.hertsig.commander.util.applyIf
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
+import java.nio.file.attribute.FileTime
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlin.io.path.fileSize
+import kotlin.io.path.getLastModifiedTime
 import kotlin.io.path.moveTo
 
 class PathLine(private val parent: FolderPanel) {
@@ -48,8 +53,8 @@ class PathLine(private val parent: FolderPanel) {
         val listener = remember(file) { FileMouseListener(parent, file, focusRequester, showContextMenu) }
         PathLine(file, listener) {
             FileIcon(file)
-            TooltipText(file.fileName.toString(), Modifier.weight(nameWeight).fillMaxWidth()) {
-                Text(file.fileName.toString(), softWrap = false, maxLines = 1, overflow = TextOverflow.Clip)
+            TooltipText("${file.fileName} - ${formatDate(file.getLastModifiedTime().toInstant())}", Modifier.weight(nameWeight).fillMaxWidth()) {
+                Text("${file.fileName}", softWrap = false, maxLines = 1, overflow = TextOverflow.Clip)
             }
             Text(formatSize(file.fileSize()), Modifier.weight(sizeWeight).fillMaxWidth(), textAlign = TextAlign.Right)
             val type = fileType(file) ?: ""
@@ -114,6 +119,13 @@ class PathLine(private val parent: FolderPanel) {
                 path.moveTo(target)
                 parent.forceReload()
             }
+            SmallDropdownMenuItem("Move to other panel", listener.showContextMenu, path.parent !in FolderPanel.roots) {
+                val target = parent.other.current.value.resolve(path.fileName)
+                log.debug("Moving $path to $target")
+                path.moveTo(target)
+                parent.forceReload()
+                parent.other.forceReload()
+            }
             SmallDropdownMenuItem("Delete", listener.showContextMenu, !path.endsWith("..")) {
                 if (path.toFile().deleteRecursively()) {
                     log.debug("Deleted ${path.normalize()}")
@@ -131,6 +143,8 @@ class PathLine(private val parent: FolderPanel) {
         hovered -> MaterialTheme.colors.secondaryVariant
         else -> MaterialTheme.colors.background
     }
+
+    private fun formatDate(date: Instant) = date.atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm"))
 
     companion object {
         private const val nameWeight = 15f

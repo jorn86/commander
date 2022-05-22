@@ -40,11 +40,13 @@ import kotlin.streams.toList
 class FolderPanel(
     private val focusDirectionForTab: FocusDirection,
     private val favorites: SnapshotStateList<Favorite>,
-    private val showHidden: Boolean = false
+    private val showHidden: Boolean = false,
 ) {
     private val log = LoggerFactory.getLogger(FolderPanel::class.java)
 
-    private lateinit var current: MutableState<Path>
+    internal lateinit var other: FolderPanel
+
+    internal lateinit var current: MutableState<Path>
     private lateinit var selection: SnapshotStateList<Path>
     private lateinit var history: SnapshotStateList<Path>
     private lateinit var indexInHistory: MutableState<Int>
@@ -170,7 +172,7 @@ class FolderPanel(
         }
         indexInHistory.value += 1
         history.removeRange(indexInHistory.value, history.size)
-        history.add(path)
+        history.add(path.normalize())
     }
 
     fun isSelected(path: Path) = path in selection
@@ -200,8 +202,7 @@ class FolderPanel(
         if (indexInHistory.value > 0) {
             indexInHistory.value -= 1
             selection.clear()
-            // DO NOT use setCurrentFolder here!
-            current.value = history[indexInHistory.value]
+            updateHistory(true)
         }
     }
 
@@ -209,8 +210,27 @@ class FolderPanel(
         if (indexInHistory.value < history.size - 1) {
             indexInHistory.value += 1
             selection.clear()
-            // DO NOT use setCurrentFolder here!
-            current.value = history[indexInHistory.value]
+            updateHistory(false)
+        }
+    }
+
+    // TODO extract to proper state management & make tests
+    private tailrec fun updateHistory(backwards: Boolean) {
+        val it = history[indexInHistory.value]
+        if (it.isDirectory()) {
+            current.value = it
+        } else {
+            log.debug("History entry no longer exists: $it")
+            history.removeAt(indexInHistory.value)
+            indexInHistory.value = indexInHistory.value.coerceIn(0, history.size - 1)
+            while (indexInHistory.value > 0 && history[indexInHistory.value] == history[indexInHistory.value - 1]) {
+                log.debug("Removing duplicate history entry: ${history[indexInHistory.value]}")
+                history.removeAt(indexInHistory.value)
+                if (backwards) indexInHistory.value -= 1
+            }
+            if (backwards) indexInHistory.value -= 1
+            indexInHistory.value = indexInHistory.value.coerceIn(0, history.size - 1)
+            updateHistory(backwards)
         }
     }
 
@@ -218,6 +238,7 @@ class FolderPanel(
         showDeleteDialog.value = true
     }
 
+    // TODO use filesystem watcher to auto-trigger reload when needed
     internal fun forceReload() {
         val folder = current.value
         current.value = folder.parent

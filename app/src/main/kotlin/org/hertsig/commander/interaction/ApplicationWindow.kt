@@ -48,12 +48,15 @@ fun ApplicationScope.ApplicationWindow() {
                 )
             }
             Row(Modifier.fillMaxSize()) {
-                FolderPanel(FocusDirection.Right, favorites)
-                    .Panel(favorites.first().path, Modifier.fillMaxHeight().fillMaxWidth(0.5f))
+                val left = FolderPanel(FocusDirection.Right, favorites)
+                val right = FolderPanel(FocusDirection.Left, favorites)
+                left.other = right
+                right.other = left
+
+                left.Panel(favorites.first().path, Modifier.fillMaxHeight().fillMaxWidth(0.5f))
                 Divider(Modifier.fillMaxHeight().width(1.dp), MaterialTheme.colors.onSurface)
                 // "max width" meaning the rest of what's left (after the left panel takes half). Yes, very intuitive.
-                FolderPanel(FocusDirection.Left, favorites)
-                    .Panel(favorites[4].path, modifier = Modifier.fillMaxHeight().fillMaxWidth())
+                right.Panel(favorites[4].path, modifier = Modifier.fillMaxHeight().fillMaxWidth())
             }
         }
     }
