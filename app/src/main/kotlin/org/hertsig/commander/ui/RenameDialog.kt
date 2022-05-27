@@ -72,6 +72,5 @@ class RenameDialog(private val parent: FolderPanel) {
         val newName = target.value.text.trim()
         log.info("Renaming ${source.absolutePathString()} to $newName")
         source.moveTo(source.parent.resolve(newName))
-        parent.forceReload()
     }
 }

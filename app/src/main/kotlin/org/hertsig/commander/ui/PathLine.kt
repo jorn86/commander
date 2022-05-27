@@ -35,7 +35,6 @@ import org.hertsig.commander.ui.component.TooltipText
 import org.hertsig.commander.util.applyIf
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
-import java.nio.file.attribute.FileTime
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -117,14 +116,11 @@ class PathLine(private val parent: FolderPanel) {
                 val target = path.parent.parent.resolve(path.fileName)
                 log.debug("Moving $path to $target")
                 path.moveTo(target)
-                parent.forceReload()
             }
             SmallDropdownMenuItem("Move to other panel", listener.showContextMenu, path.parent !in FolderPanel.roots) {
                 val target = parent.other.current.value.resolve(path.fileName)
                 log.debug("Moving $path to $target")
                 path.moveTo(target)
-                parent.forceReload()
-                parent.other.forceReload()
             }
             SmallDropdownMenuItem("Delete", listener.showContextMenu, !path.endsWith("..")) {
                 if (path.toFile().deleteRecursively()) {
@@ -132,7 +128,6 @@ class PathLine(private val parent: FolderPanel) {
                 } else {
                     log.warn("Failed to delete ${path.normalize()}")
                 }
-                parent.forceReload()
             }
         }
     }

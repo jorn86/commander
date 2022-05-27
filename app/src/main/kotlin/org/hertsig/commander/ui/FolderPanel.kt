@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.google.common.collect.Ordering
+import kotlinx.coroutines.delay
 import org.hertsig.commander.core.*
 import org.hertsig.commander.interaction.GlobalKeyboardListener
 import org.hertsig.commander.ui.component.SmallButton
@@ -30,9 +31,8 @@ import org.hertsig.mouse.MouseListener
 import org.slf4j.LoggerFactory
 import java.awt.Desktop
 import java.io.File
-import java.nio.file.AccessDeniedException
-import java.nio.file.Files
-import java.nio.file.Path
+import java.nio.file.*
+import java.nio.file.StandardWatchEventKinds.*
 import kotlin.io.path.fileSize
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isHidden
@@ -47,10 +47,15 @@ class FolderPanel(
 ) {
     private val log = LoggerFactory.getLogger(FolderPanel::class.java)
 
-    private val renameDialog = RenameDialog(this)
+    private val watcher = FileSystems.getDefault().newWatchService()
+    private var lastKey: WatchKey? = null
+    private lateinit var updateHack: MutableState<Int>
+
     internal lateinit var other: FolderPanel
+    private val renameDialog = RenameDialog(this)
 
     internal lateinit var current: MutableState<Path>
+    private lateinit var contents: State<List<Path>>
     private lateinit var selection: SnapshotStateList<Path>
     private lateinit var history: SnapshotStateList<Path>
     private lateinit var indexInHistory: MutableState<Int>
@@ -58,10 +63,25 @@ class FolderPanel(
 
     @Composable
     fun Panel(initialPath: Path = roots.first(), modifier: Modifier = Modifier) {
-        current = remember { mutableStateOf(initialPath) }
+        current = remember { mutableStateOf(initialPath.parent) }
         selection = remember { mutableStateListOf() }
-        history = remember { mutableStateListOf(initialPath) }
-        indexInHistory = remember { mutableStateOf(0) }
+        history = remember { mutableStateListOf() }
+        indexInHistory = remember { mutableStateOf(-1) }
+        updateHack = remember { mutableStateOf(0) }
+        contents = remember(updateHack.value) { derivedStateOf {
+            log.debug("Listing contents for ${current.value} (${updateHack.value})")
+            Files.list(current.value).filter(::show).toList().sortedWith(fileOrder)
+        }}
+        LaunchedEffect(Unit) {
+            setCurrentFolder(initialPath)
+            while (true) {
+                lastKey?.pollEvents()?.forEach {
+                    log.debug("Got ${it.kind()} ${it.context()} ${it.count()}")
+                    updateHack.value += 1
+                }
+                delay(100)
+            }
+        }
 
         Column(modifier
             .onKeyEvent(GlobalKeyboardListener(this, LocalFocusManager.current, focusDirectionForTab))
@@ -76,7 +96,7 @@ class FolderPanel(
             Row(Modifier.fillMaxWidth()) {
                 roots.forEach { RootButton(it) }
                 Row(Modifier.fillMaxWidth(), Arrangement.End) {
-                    SmallButton(onClick = { forceReload() }) {
+                    SmallButton(onClick = { updateHack.value += 1 }) {
                         Icon(Icons.Outlined.Refresh, "Refresh")
                     }
 
@@ -91,7 +111,7 @@ class FolderPanel(
                 if (!roots.contains(current.value)) {
                     PathLine(this@FolderPanel).FolderLine(current.value.resolve(".."))
                 }
-                currentFolderContents().forEach {
+                contents.value.forEach {
                     if (it.isDirectory()) {
                         PathLine(this@FolderPanel).FolderLine(it)
                     } else {
@@ -139,8 +159,7 @@ class FolderPanel(
     @Composable
     private fun StatusBar(modifier: Modifier = Modifier) {
         Row(modifier.background(MaterialTheme.colors.secondary).fillMaxWidth().padding(4.dp, 2.dp)) {
-            val contents = currentFolderContents()
-            Text(statusBarText(contents), color = MaterialTheme.colors.onSecondary)
+            Text(statusBarText(contents.value), color = MaterialTheme.colors.onSecondary)
             if (selection.isNotEmpty()) {
                 Text("Selected: ${statusBarText(selection)}", Modifier.fillMaxWidth(), MaterialTheme.colors.onSecondary, textAlign = TextAlign.End)
             }
@@ -163,7 +182,6 @@ class FolderPanel(
             }
         }
         selection.clear()
-        forceReload()
     }
 
     fun setCurrentFolder(path: Path) {
@@ -180,6 +198,13 @@ class FolderPanel(
         indexInHistory.value += 1
         history.removeRange(indexInHistory.value, history.size)
         history.add(path.normalize())
+
+        updateWatcher()
+    }
+
+    private fun updateWatcher() {
+        lastKey?.cancel()
+        lastKey = current.value.register(watcher, ENTRY_CREATE, ENTRY_DELETE, ENTRY_MODIFY)
     }
 
     fun isSelected(path: Path) = path in selection
@@ -195,13 +220,12 @@ class FolderPanel(
 
     fun selectRange(to: Path) {
         val from = selection.lastOrNull() ?: return select(to, false)
-        val contents = currentFolderContents()
-        val fromIndex = contents.indexOf(from)
-        val toIndex = contents.indexOf(to)
+        val fromIndex = contents.value.indexOf(from)
+        val toIndex = contents.value.indexOf(to)
         if (toIndex > fromIndex) {
-            contents.subList(fromIndex, toIndex + 1).filterTo(selection) { !selection.contains(it) }
+            contents.value.subList(fromIndex, toIndex + 1).filterTo(selection) { !selection.contains(it) }
         } else if (fromIndex > toIndex) {
-            contents.subList(toIndex, fromIndex).filterTo(selection) { !selection.contains(it) }
+            contents.value.subList(toIndex, fromIndex).filterTo(selection) { !selection.contains(it) }
         }
     }
 
@@ -228,6 +252,7 @@ class FolderPanel(
         val it = history[indexInHistory.value]
         if (it.isDirectory()) {
             current.value = it
+            updateWatcher()
         } else {
             log.debug("History entry no longer exists: $it")
             history.removeAt(indexInHistory.value)
@@ -246,19 +271,6 @@ class FolderPanel(
     fun onDelete() {
         showDeleteDialog.value = true
     }
-
-    // TODO use filesystem watcher to auto-trigger reload when needed
-    internal fun forceReload() {
-        val folder = current.value
-        if (folder in roots) {
-            current.value = favorites.first().path
-        } else {
-            current.value = folder.parent
-        }
-        current.value = folder
-    }
-
-    private fun currentFolderContents() = Files.list(current.value).filter(::show).toList().sortedWith(fileOrder)
 
     private fun show(path: Path) = try {
         if (path.isHidden()) showHidden else Files.isReadable(path)
