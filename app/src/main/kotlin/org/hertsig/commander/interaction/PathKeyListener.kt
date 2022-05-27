@@ -16,6 +16,7 @@ class PathKeyListener(
             when (event.key) {
                 Key.Enter -> Desktop.getDesktop().open(path.toFile())
                 Key.Spacebar -> ui.select(path, event.isCtrlPressed)
+                Key.F2 -> ui.rename(path)
             }
         }
         else if (event.type == KeyEventType.KeyUp && !event.isCtrlPressed) {

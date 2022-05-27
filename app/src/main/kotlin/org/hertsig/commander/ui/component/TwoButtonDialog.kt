@@ -1,8 +1,6 @@
 package org.hertsig.commander.ui.component
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.AlertDialog
 import androidx.compose.material.Button
 import androidx.compose.material.ExperimentalMaterialApi
@@ -14,9 +12,17 @@ import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
-fun TwoButtonDialog(visible: MutableState<Boolean>, text: String, confirm: String = "OK", cancel: String = "Cancel", onConfirm: () -> Unit) {
+fun TwoButtonDialog(
+    visible: MutableState<Boolean>,
+    text: String,
+    confirm: String = "OK",
+    cancel: String = "Cancel",
+    onConfirm: () -> Unit,
+    extraContent: @Composable () -> Unit = {}
+) {
     if (visible.value) {
-        AlertDialog(onDismissRequest = { visible.value = false }, {
+        AlertDialog({ visible.value = false }, {
+            extraContent()
             Row(Modifier.padding(5.dp), Arrangement.spacedBy(5.dp)) {
                 Button({
                     visible.value = false
@@ -28,6 +34,6 @@ fun TwoButtonDialog(visible: MutableState<Boolean>, text: String, confirm: Strin
                     Text(cancel)
                 }
             }
-        }, title = { Text(text) })
+        }, Modifier.width(300.dp), { Text(text) })
     }
 }

@@ -2,7 +2,10 @@ package org.hertsig.commander.ui
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.*
+import androidx.compose.material.CursorDropdownMenu
+import androidx.compose.material.Icon
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.FolderOpen
@@ -18,7 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.google.common.collect.Ordering
 import org.hertsig.commander.core.*
-import org.hertsig.commander.interaction.*
+import org.hertsig.commander.interaction.GlobalKeyboardListener
 import org.hertsig.commander.ui.component.SmallButton
 import org.hertsig.commander.ui.component.SmallDropdownMenuItem
 import org.hertsig.commander.ui.component.TooltipText
@@ -44,6 +47,7 @@ class FolderPanel(
 ) {
     private val log = LoggerFactory.getLogger(FolderPanel::class.java)
 
+    private val renameDialog = RenameDialog(this)
     internal lateinit var other: FolderPanel
 
     internal lateinit var current: MutableState<Path>
@@ -100,8 +104,11 @@ class FolderPanel(
             showDeleteDialog = remember { mutableStateOf(false) }
             TwoButtonDialog(showDeleteDialog, "Delete ${selection.size} files", "Delete",
                 onConfirm = ::confirmDeleteSelection)
+
+            renameDialog.RenameDialog()
         }
     }
+
 
     @Composable
     private fun FavoritesButton() {
@@ -198,6 +205,8 @@ class FolderPanel(
         }
     }
 
+    fun rename(path: Path) = renameDialog.show(path)
+
     fun back() {
         if (indexInHistory.value > 0) {
             indexInHistory.value -= 1
@@ -241,7 +250,11 @@ class FolderPanel(
     // TODO use filesystem watcher to auto-trigger reload when needed
     internal fun forceReload() {
         val folder = current.value
-        current.value = folder.parent
+        if (folder in roots) {
+            current.value = favorites.first().path
+        } else {
+            current.value = folder.parent
+        }
         current.value = folder
     }
 
