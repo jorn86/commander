@@ -40,6 +40,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.io.path.fileSize
 import kotlin.io.path.getLastModifiedTime
+import kotlin.io.path.isRegularFile
 import kotlin.io.path.moveTo
 
 class PathLine(private val parent: FolderPanel) {
@@ -51,6 +52,7 @@ class PathLine(private val parent: FolderPanel) {
         val showContextMenu = remember { mutableStateOf(false) }
         val listener = remember(file) { FileMouseListener(parent, file, focusRequester, showContextMenu) }
         PathLine(file, listener) {
+            if (!file.isRegularFile()) return@PathLine
             FileIcon(file)
             TooltipText("${file.fileName} - ${formatDate(file.getLastModifiedTime().toInstant())}", Modifier.weight(nameWeight).fillMaxWidth()) {
                 Text("${file.fileName}", softWrap = false, maxLines = 1, overflow = TextOverflow.Clip)

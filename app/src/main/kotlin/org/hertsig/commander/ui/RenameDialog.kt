@@ -20,7 +20,7 @@ import java.nio.file.Path
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.moveTo
 
-class RenameDialog(private val parent: FolderPanel) {
+class RenameDialog {
     private val log = LoggerFactory.getLogger(RenameDialog::class.java)
 
     private lateinit var visible: MutableState<Boolean>

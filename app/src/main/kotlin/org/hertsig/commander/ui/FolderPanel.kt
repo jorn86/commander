@@ -52,7 +52,7 @@ class FolderPanel(
     private lateinit var updateHack: MutableState<Int>
 
     internal lateinit var other: FolderPanel
-    private val renameDialog = RenameDialog(this)
+    private val renameDialog = RenameDialog()
 
     internal lateinit var current: MutableState<Path>
     private lateinit var contents: State<List<Path>>
