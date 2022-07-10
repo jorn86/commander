@@ -27,10 +27,10 @@ import org.hertsig.commander.ui.component.SmallButton
 import org.hertsig.commander.ui.component.SmallDropdownMenuItem
 import org.hertsig.commander.ui.component.TooltipText
 import org.hertsig.commander.ui.component.TwoButtonDialog
+import org.hertsig.commander.ui.state.RootsState
 import org.hertsig.mouse.MouseListener
 import org.slf4j.LoggerFactory
 import java.awt.Desktop
-import java.io.File
 import java.nio.file.*
 import java.nio.file.StandardWatchEventKinds.*
 import kotlin.io.path.fileSize
@@ -42,6 +42,7 @@ import kotlin.streams.toList
 @OptIn(ExperimentalFoundationApi::class)
 class FolderPanel(
     private val focusDirectionForTab: FocusDirection,
+    internal val roots: RootsState,
     private val favorites: SnapshotStateList<Favorite>,
     private val showHidden: Boolean = false,
 ) {
@@ -62,7 +63,7 @@ class FolderPanel(
     private lateinit var showDeleteDialog: MutableState<Boolean>
 
     @Composable
-    fun Panel(initialPath: Path = roots.first(), modifier: Modifier = Modifier) {
+    fun Panel(initialPath: Path = roots.roots.first(), modifier: Modifier = Modifier) {
         current = remember { mutableStateOf(initialPath.parent) }
         selection = remember { mutableStateListOf() }
         history = remember { mutableStateListOf() }
@@ -79,6 +80,7 @@ class FolderPanel(
                     log.debug("Got ${it.kind()} ${it.context()} ${it.count()}")
                     updateHack.value += 1
                 }
+                roots.reload()
                 delay(100)
             }
         }
@@ -94,7 +96,7 @@ class FolderPanel(
                 setClipboard(current.value.toString())
             })
             Row(Modifier.fillMaxWidth()) {
-                roots.forEach { RootButton(it) }
+                roots.roots.forEach { RootButton(it) }
                 Row(Modifier.fillMaxWidth(), Arrangement.End) {
                     SmallButton(onClick = { updateHack.value += 1 }) {
                         Icon(Icons.Outlined.Refresh, "Refresh")
@@ -108,7 +110,7 @@ class FolderPanel(
                 }
             }
             Column(Modifier.padding(6.dp).fillMaxSize().weight(0.1f).verticalScroll(rememberScrollState())) {
-                if (!roots.contains(current.value)) {
+                if (!roots.roots.contains(current.value)) {
                     PathLine(this@FolderPanel).FolderLine(current.value.resolve(".."))
                 }
                 contents.value.forEach {
@@ -280,8 +282,6 @@ class FolderPanel(
     }
 
     companion object {
-        internal val roots = File.listRoots().map { it.toPath() }
-
         private val fileOrder = Ordering.explicit(true, false)
             .onResultOf(Path::isDirectory)
             .thenComparing({ it.fileName.toString() }, String.CASE_INSENSITIVE_ORDER)

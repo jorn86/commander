@@ -9,7 +9,7 @@ dependencies {
     api(project(":core"))
     implementation(compose.desktop.currentOs)
     implementation(compose.materialIconsExtended)
-    implementation("com.h2database:h2:2.1.210")
+    implementation("com.h2database:h2:2.1.212")
     implementation("com.google.guava:guava:31.1-jre")
 }
 

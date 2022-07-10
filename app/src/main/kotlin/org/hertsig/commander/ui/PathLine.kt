@@ -114,12 +114,12 @@ class PathLine(private val parent: FolderPanel) {
             SmallDropdownMenuItem("Copy path", listener.showContextMenu) {
                 setClipboard(path.normalize().toString())
             }
-            SmallDropdownMenuItem("Move to parent", listener.showContextMenu, path.parent !in FolderPanel.roots) {
+            SmallDropdownMenuItem("Move to parent", listener.showContextMenu, path.parent !in parent.roots.roots) {
                 val target = path.parent.parent.resolve(path.fileName)
                 log.debug("Moving $path to $target")
                 path.moveTo(target)
             }
-            SmallDropdownMenuItem("Move to other panel", listener.showContextMenu, path.parent !in FolderPanel.roots) {
+            SmallDropdownMenuItem("Move to other panel", listener.showContextMenu, path.parent !in parent.roots.roots) {
                 val target = parent.other.current.value.resolve(path.fileName)
                 log.debug("Moving $path to $target")
                 path.moveTo(target)

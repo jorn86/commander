@@ -21,6 +21,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
 import org.hertsig.commander.core.Favorite
 import org.hertsig.commander.ui.FolderPanel
+import org.hertsig.commander.ui.state.RootsState
 import java.nio.file.Paths
 
 @Composable
@@ -44,12 +45,20 @@ fun ApplicationScope.ApplicationWindow() {
             )
         ) {
             val favorites = remember {
-                mutableStateListOf<Favorite>(
+                mutableStateListOf(
+                    Favorite(Paths.get("C:/Torrents")),
+                    Favorite(Paths.get("C:/Users/Jorn/My Drive")),
+                    Favorite(Paths.get("C:/Users/Jorn/Documents/repositories")),
+                    Favorite(Paths.get("C:/Users/Jorn/Downloads")),
+                    Favorite(Paths.get("C:/Users/Jorn/My Drive/D&D assets/5th Edition"), "5e books"),
+//                    Favorite(Paths.get("C:/Program Files (x86)/Steam/steamapps/common"), "Steam"),
+                    Favorite(Paths.get("C:/Program Files (x86)/Steam/steamapps/common/VoxelTycoon/Content"), "VT mods"),
                 )
             }
+            val roots = remember { RootsState() }
             Row(Modifier.fillMaxSize()) {
-                val left = FolderPanel(FocusDirection.Right, favorites)
-                val right = FolderPanel(FocusDirection.Left, favorites)
+                val left = FolderPanel(FocusDirection.Right, roots, favorites)
+                val right = FolderPanel(FocusDirection.Left, roots, favorites)
                 left.other = right
                 right.other = left
 
