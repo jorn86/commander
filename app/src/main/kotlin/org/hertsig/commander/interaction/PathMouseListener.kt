@@ -7,7 +7,6 @@ import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
 import org.hertsig.commander.ui.FolderPanel
 import org.hertsig.mouse.MouseListener
-import org.slf4j.LoggerFactory
 import java.nio.file.Path
 
 open class PathMouseListener(
@@ -16,8 +15,6 @@ open class PathMouseListener(
     val focusRequester: FocusRequester,
     val showContextMenu: MutableState<Boolean>,
 ): MouseListener() {
-    private val log = LoggerFactory.getLogger(javaClass)
-
     override fun onPrimary(modifiers: PointerKeyboardModifiers) {
         if (modifiers.isShiftPressed) {
             ui.selectRange(path)

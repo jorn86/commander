@@ -4,10 +4,8 @@ import org.slf4j.LoggerFactory
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.awt.image.BufferedImage
-import java.nio.file.Files
 import java.nio.file.Path
 import javax.swing.ImageIcon
-import javax.swing.JFileChooser
 import javax.swing.filechooser.FileSystemView
 
 private const val KB = 1024f
@@ -39,9 +37,6 @@ fun formatSize(fileSize: Long): String {
         else -> String.format("%.2f $unit", amount)
     }
 }
-
-fun fileType(path: Path): String? = FileSystemView.getFileSystemView().getSystemTypeDescription(path.toFile())
-    ?: Files.probeContentType(path)
 
 fun getFileIcon(path: Path): BufferedImage? {
     val systemIcon = FileSystemView.getFileSystemView().getSystemIcon(path.toFile())

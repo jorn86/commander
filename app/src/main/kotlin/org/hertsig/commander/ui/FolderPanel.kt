@@ -1,7 +1,12 @@
 package org.hertsig.commander.ui
 
-import androidx.compose.foundation.*
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.mouseClickable
 import androidx.compose.material.CursorDropdownMenu
 import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
@@ -27,12 +32,16 @@ import org.hertsig.commander.ui.component.SmallButton
 import org.hertsig.commander.ui.component.SmallDropdownMenuItem
 import org.hertsig.commander.ui.component.TooltipText
 import org.hertsig.commander.ui.component.TwoButtonDialog
-import org.hertsig.commander.ui.state.RootsState
+import org.hertsig.commander.ui.state.*
 import org.hertsig.mouse.MouseListener
 import org.slf4j.LoggerFactory
 import java.awt.Desktop
-import java.nio.file.*
+import java.io.IOException
+import java.nio.file.FileSystems
+import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.StandardWatchEventKinds.*
+import java.nio.file.WatchKey
 import kotlin.io.path.fileSize
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isHidden
@@ -71,7 +80,12 @@ class FolderPanel(
         updateHack = remember { mutableStateOf(0) }
         contents = remember(updateHack.value) { derivedStateOf {
             log.debug("Listing contents for ${current.value} (${updateHack.value})")
-            Files.list(current.value).filter(::show).toList().sortedWith(fileOrder)
+            try {
+                Files.list(current.value).filter(::show).toList().sortedWith(fileOrder)
+            } catch (e: IOException) {
+                log.error("Failed to list contents of ${current.value}", e)
+                listOf()
+            }
         }}
         LaunchedEffect(Unit) {
             setCurrentFolder(initialPath)
@@ -109,16 +123,15 @@ class FolderPanel(
                     }
                 }
             }
-            Column(Modifier.padding(6.dp).fillMaxSize().weight(0.1f).verticalScroll(rememberScrollState())) {
+            LazyColumn(Modifier.padding(6.dp).fillMaxSize().weight(0.1f)) {
                 if (!roots.roots.contains(current.value)) {
-                    PathLine(this@FolderPanel).FolderLine(current.value.resolve(".."))
-                }
-                contents.value.forEach {
-                    if (it.isDirectory()) {
-                        PathLine(this@FolderPanel).FolderLine(it)
-                    } else {
-                        PathLine(this@FolderPanel).FileLine(it)
+                    item {
+                        PathLine(current.value.resolve(".."))
                     }
+                }
+
+                items(contents.value) {
+                    PathLine(it)
                 }
             }
             StatusBar(Modifier)
@@ -131,6 +144,14 @@ class FolderPanel(
         }
     }
 
+    @Composable
+    private fun PathLine(path: Path) {
+        when (val data = rememberFileData(path, updateHack.value)) {
+            is Folder -> PathLine(this@FolderPanel).FolderLine(data)
+            is RegularFile -> PathLine(this@FolderPanel).FileLine(data)
+            Failed -> {}
+        }
+    }
 
     @Composable
     private fun FavoritesButton() {
@@ -151,7 +172,7 @@ class FolderPanel(
     private fun RootButton(path: Path) {
         val free = formatSize(path.toFile().freeSpace)
         val total = formatSize(path.toFile().totalSpace)
-        TooltipText("Free: $free / $total"){
+        TooltipText("Free: $free / $total") {
             SmallButton({ setCurrentFolder(path) }) {
                 Text(path.toString())
             }
@@ -168,11 +189,14 @@ class FolderPanel(
         }
     }
 
-    private fun statusBarText(contents: List<Path>): String {
+    private fun statusBarText(contents: List<Path>) = try {
         val (folders, files) = contents.countWhere { it.isDirectory() }
         val size = contents.filter { it.isRegularFile() }.sumOf { it.fileSize() }
         val filesText = formatMultiple(files, "file")?.let { "$it (${formatSize(size)})" }
-        return listOfNotNull(formatMultiple(folders, "folder"), filesText).joinToString()
+        listOfNotNull(formatMultiple(folders, "folder"), filesText).joinToString()
+    } catch (e: IOException) {
+        log.error("Failed to get status bar text", e)
+        e.message.orEmpty()
     }
 
     private fun confirmDeleteSelection() {
@@ -189,8 +213,9 @@ class FolderPanel(
     fun setCurrentFolder(path: Path) {
         try {
             Files.list(path)
-        } catch (e: AccessDeniedException) {
+        } catch (e: IOException) {
             log.debug("Listing current folder", e)
+            updateHack.value += 1
             return
         }
         if (path != current.value) {
@@ -274,12 +299,7 @@ class FolderPanel(
         showDeleteDialog.value = true
     }
 
-    private fun show(path: Path) = try {
-        if (path.isHidden()) showHidden else Files.isReadable(path)
-    } catch (e: AccessDeniedException) {
-        log.debug("$path readable", e)
-        false
-    }
+    private fun show(path: Path) = if (path.isHidden()) showHidden else Files.isReadable(path)
 
     companion object {
         private val fileOrder = Ordering.explicit(true, false)

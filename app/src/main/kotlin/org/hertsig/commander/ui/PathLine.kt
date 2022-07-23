@@ -12,68 +12,61 @@ import androidx.compose.material.CursorDropdownMenu
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.toPainter
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import org.hertsig.commander.core.fileType
 import org.hertsig.commander.core.formatSize
 import org.hertsig.commander.core.setClipboard
 import org.hertsig.commander.interaction.FileMouseListener
 import org.hertsig.commander.interaction.FolderMouseListener
 import org.hertsig.commander.interaction.PathKeyListener
 import org.hertsig.commander.interaction.PathMouseListener
-import org.hertsig.commander.ui.component.FileIcon
 import org.hertsig.commander.ui.component.SmallDropdownMenuItem
 import org.hertsig.commander.ui.component.TooltipText
+import org.hertsig.commander.ui.state.FileState
+import org.hertsig.commander.ui.state.Folder
+import org.hertsig.commander.ui.state.RegularFile
 import org.hertsig.commander.util.applyIf
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import kotlin.io.path.fileSize
-import kotlin.io.path.getLastModifiedTime
-import kotlin.io.path.isRegularFile
 import kotlin.io.path.moveTo
 
 class PathLine(private val parent: FolderPanel) {
     private val log = LoggerFactory.getLogger(FolderPanel::class.java)
 
     @Composable
-    fun FileLine(file: Path) {
-        val focusRequester = remember { FocusRequester() }
-        val showContextMenu = remember { mutableStateOf(false) }
-        val listener = remember(file) { FileMouseListener(parent, file, focusRequester, showContextMenu) }
-        PathLine(file, listener) {
-            if (!file.isRegularFile()) return@PathLine
-            FileIcon(file)
-            TooltipText("${file.fileName} - ${formatDate(file.getLastModifiedTime().toInstant())}", Modifier.weight(nameWeight).fillMaxWidth()) {
-                Text("${file.fileName}", softWrap = false, maxLines = 1, overflow = TextOverflow.Clip)
+    fun FileLine(data: RegularFile) {
+        val listener = remember(data.path) { FileMouseListener(parent, data.path, data.focusRequester, data.showContextMenu) }
+
+        PathLine(data, listener) {
+            data.icon?.let { Image(it.toPainter(), "icon") }
+            TooltipText("${data.name} - ${formatDate(data.lastModified)}", Modifier.weight(nameWeight).fillMaxWidth()) {
+                Text(data.name, softWrap = false, maxLines = 1, overflow = TextOverflow.Clip)
             }
-            Text(formatSize(file.fileSize()), Modifier.weight(sizeWeight).fillMaxWidth(), textAlign = TextAlign.Right)
-            val type = fileType(file) ?: ""
-            TooltipText(type, Modifier.weight(typeWeight).fillMaxWidth()) {
-                Text(type, softWrap = false, maxLines = 1, overflow = TextOverflow.Clip)
+            Text(formatSize(data.size), Modifier.weight(sizeWeight).fillMaxWidth(), textAlign = TextAlign.Right)
+            TooltipText(data.type, Modifier.weight(typeWeight).fillMaxWidth()) {
+                Text(data.type, softWrap = false, maxLines = 1, overflow = TextOverflow.Clip)
             }
         }
     }
 
     @Composable
-    fun FolderLine(folder: Path) {
-        val focusRequester = remember { FocusRequester() }
-        val showContextMenu = remember { mutableStateOf(false) }
-        val listener = remember(folder) { FolderMouseListener(parent, folder, focusRequester, showContextMenu) }
-        PathLine(folder, listener) {
-            FileIcon(folder)
-            TooltipText(folder.fileName.toString()) {
-                Text(folder.fileName.toString(), softWrap = false, maxLines = 1, overflow = TextOverflow.Clip)
+    fun FolderLine(data: Folder) {
+        val listener = remember(data.path) { FolderMouseListener(parent, data.path, data.focusRequester, data.showContextMenu) }
+        PathLine(data, listener) {
+            data.icon?.let { Image(it.toPainter(), "icon") }
+            TooltipText(data.name) {
+                Text(data.name, softWrap = false, maxLines = 1, overflow = TextOverflow.Clip)
             }
         }
     }
@@ -81,7 +74,7 @@ class PathLine(private val parent: FolderPanel) {
     @OptIn(ExperimentalFoundationApi::class)
     @Composable
     private fun PathLine(
-        path: Path,
+        data: FileState,
         listener: PathMouseListener,
         modifier: Modifier = Modifier,
         content: @Composable RowScope.() -> Unit,
@@ -94,37 +87,37 @@ class PathLine(private val parent: FolderPanel) {
             .focusRequester(listener.focusRequester)
             .focusable(interactionSource = source)
             .hoverable(source)
-            .onKeyEvent(PathKeyListener(parent, path))
+            .onKeyEvent(PathKeyListener(parent, data.path))
             .mouseClickable(onClick = listener)) {
 
             Row(modifier.fillMaxWidth()
                 // TODO dashed border (currently unsupported)
                 .applyIf(focused) { border(1.dp, MaterialTheme.colors.secondary) }
-                .background(background(parent.isSelected(path), hovered)),
+                .background(background(parent.isSelected(data.path), hovered)),
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
                 content = content,
             )
-            PathDropdownMenu(listener, path)
+            PathDropdownMenu(data.showContextMenu, data.path)
         }
     }
 
     @Composable
-    private fun PathDropdownMenu(listener: PathMouseListener, path: Path) {
-        CursorDropdownMenu(listener.showContextMenu.value, { listener.showContextMenu.value = false }) {
-            SmallDropdownMenuItem("Copy path", listener.showContextMenu) {
+    private fun PathDropdownMenu(showContextMenu: MutableState<Boolean>, path: Path) {
+        CursorDropdownMenu(showContextMenu.value, { showContextMenu.value = false }) {
+            SmallDropdownMenuItem("Copy path", showContextMenu) {
                 setClipboard(path.normalize().toString())
             }
-            SmallDropdownMenuItem("Move to parent", listener.showContextMenu, path.parent !in parent.roots.roots) {
+            SmallDropdownMenuItem("Move to parent", showContextMenu, path.parent !in parent.roots.roots) {
                 val target = path.parent.parent.resolve(path.fileName)
                 log.debug("Moving $path to $target")
                 path.moveTo(target)
             }
-            SmallDropdownMenuItem("Move to other panel", listener.showContextMenu, path.parent !in parent.roots.roots) {
+            SmallDropdownMenuItem("Move to other panel", showContextMenu, path.parent !in parent.roots.roots) {
                 val target = parent.other.current.value.resolve(path.fileName)
                 log.debug("Moving $path to $target")
                 path.moveTo(target)
             }
-            SmallDropdownMenuItem("Delete", listener.showContextMenu, !path.endsWith("..")) {
+            SmallDropdownMenuItem("Delete", showContextMenu, !path.endsWith("..")) {
                 if (path.toFile().deleteRecursively()) {
                     log.debug("Deleted ${path.normalize()}")
                 } else {
